@@ -1,18 +1,23 @@
-local InSpectatorMode, ShowInfos = false, false
-local TargetSpectate, LastPosition, cam
-local polarAngleDeg = 0
-local azimuthAngleDeg = 90
-local radius = -3.5
-local PlayerDate = {}
-local group = "user"
-ESX = nil
+ESX = exports["es_extended"]:getSharedObject()
+
+local group = nil
 
 Citizen.CreateThread(function()
-	while ESX == nil do
-		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
-		Citizen.Wait(0)
+	while true do 
+		group = ESX.GetPlayerData().group
+		Citizen.Wait(1500)
 	end
 end)
+
+local InSpectatorMode	= false
+local TargetSpectate	= nil
+local LastPosition		= nil
+local polarAngleDeg		= 0;
+local azimuthAngleDeg	= 90;
+local radius			= -3.5;
+local cam 				= nil
+local PlayerDate		= {}
+local ShowInfos			= false
 
 function polar3DToWorld3D(entityPosition, radius, polarAngleDeg, azimuthAngleDeg)
 	-- convert degrees to radians
@@ -29,19 +34,19 @@ function polar3DToWorld3D(entityPosition, radius, polarAngleDeg, azimuthAngleDeg
 end
 
 function spectate(target)
-
-	ESX.TriggerServerCallback('esx:getPlayerData', function(player)
+	ESX.TriggerServerCallback('esx_spectate:getPlayerData', function(player)
 		if not InSpectatorMode then
-			LastPosition = GetEntityCoords(PlayerPedId())
+			LastPosition = GetEntityCoords(GetPlayerPed(-1))
 		end
 
-		local playerPed = PlayerPedId()
+		local playerPed = GetPlayerPed(-1)
 
 		SetEntityCollision(playerPed, false, false)
 		SetEntityVisible(playerPed, false)
+		
+		SetEntityCoords(playerPed, player.position, 0.0, 0.0, 0.0, false)
 
 		PlayerData = player
-
 		if ShowInfos then
 			SendNUIMessage({
 				type = 'infos',
@@ -59,17 +64,17 @@ function spectate(target)
 
 			InSpectatorMode = true
 			TargetSpectate  = target
+
 		end)
 	end, target)
-
 end
 
 function resetNormalCamera()
 	InSpectatorMode = false
 	TargetSpectate  = nil
-	local playerPed = PlayerPedId()
+	local playerPed = GetPlayerPed(-1)
 
-	SetCamActive(cam, false)
+	SetCamActive(cam,  false)
 	RenderScriptCams(false, false, 0, true, true)
 
 	SetEntityCollision(playerPed, true, true)
@@ -77,49 +82,51 @@ function resetNormalCamera()
 	SetEntityCoords(playerPed, LastPosition.x, LastPosition.y, LastPosition.z)
 end
 
-function getPlayersList()
+function getPlayersList(callback)
+	ESX.TriggerServerCallback('esx_spectate:getPlayers', function(players)
+		if callback then
+			callback(players)
+		end
+	end)
+end
 
-	local players = ESX.Game.GetPlayers()
-	local data = {}
-
-	for i=1, #players, 1 do
-
-		local _data = {
-			id = GetPlayerServerId(players[i]),
-			name = GetPlayerName(players[i])
-		}
-		table.insert(data, _data)
-	end
-
-	return data
+function OpenAdminActionMenu(player)
+	TriggerEvent("esx_inventoryhud:openPlayerInventory", GetPlayerServerId(player), GetPlayerName(player))
 end
 
 Citizen.CreateThread(function()
 	while true do
-		Citizen.Wait(0)
-
-		if IsControlJustReleased(1, 163) then
-			if group ~= "user" then
+		Wait(0)
+		
+		if IsControlJustReleased(1, 56) then
+			if group == "mod" or group == "admin" or group == "superadmin" then
 				TriggerEvent('esx_spectate:spectate')
+			else
+				ESX.ShowNotification("Permissões Insuficientes")
 			end
 		end
 	end
 end)
 
-RegisterNetEvent('es_admin:setGroup')
-AddEventHandler('es_admin:setGroup', function(g)
-	group = g
+RegisterCommand("spectate", function()
+	if group == "mod" or group == "admin" or group == "superadmin" then
+		TriggerEvent('esx_spectate:spectate')
+	else
+		ESX.ShowNotification("Permissões Insuficientes")
+	end
 end)
 
 RegisterNetEvent('esx_spectate:spectate')
 AddEventHandler('esx_spectate:spectate', function()
 	SetNuiFocus(true, true)
 
-	SendNUIMessage({
-		type = 'show',
-		data = getPlayersList(),
-		player = GetPlayerServerId(PlayerId())
-	})
+	getPlayersList(function(players)
+		SendNUIMessage({
+			type = 'show',
+			data = players,
+			player = GetPlayerServerId(PlayerId())
+		})
+	end)
 end)
 
 RegisterNUICallback('select', function(data, cb)
@@ -142,8 +149,9 @@ RegisterNUICallback('kick', function(data, cb)
 	TriggerEvent('esx_spectate:spectate')
 end)
 
-Citizen.CreateThread(function()
 
+
+Citizen.CreateThread(function()
   	while true do
 
 		Wait(0)
@@ -151,7 +159,7 @@ Citizen.CreateThread(function()
 		if InSpectatorMode then
 
 			local targetPlayerId = GetPlayerFromServerId(TargetSpectate)
-			local playerPed	  = PlayerPedId()
+			local playerPed	  = GetPlayerPed(-1)
 			local targetPed	  = GetPlayerPed(targetPlayerId)
 			local coords	 = GetEntityCoords(targetPed)
 
@@ -159,34 +167,35 @@ Citizen.CreateThread(function()
 				if i ~= PlayerId() then
 					local otherPlayerPed = GetPlayerPed(i)
 					SetEntityNoCollisionEntity(playerPed,  otherPlayerPed,  true)
+					SetEntityVisible(playerPed, false)
 				end
 			end
 
 			if IsControlPressed(2, 241) then
-				radius = radius + 2.0
+				radius = radius + 2.0;
 			end
 
 			if IsControlPressed(2, 242) then
-				radius = radius - 2.0
+				radius = radius - 2.0;
 			end
 
 			if radius > -1 then
 				radius = -1
 			end
 
-			local xMagnitude = GetDisabledControlNormal(0, 1)
-			local yMagnitude = GetDisabledControlNormal(0, 2)
+			local xMagnitude = GetDisabledControlNormal(0, 1);
+			local yMagnitude = GetDisabledControlNormal(0, 2);
 
-			polarAngleDeg = polarAngleDeg + xMagnitude * 10
+			polarAngleDeg = polarAngleDeg + xMagnitude * 10;
 
 			if polarAngleDeg >= 360 then
 				polarAngleDeg = 0
 			end
 
-			azimuthAngleDeg = azimuthAngleDeg + yMagnitude * 10
+			azimuthAngleDeg = azimuthAngleDeg + yMagnitude * 10;
 
 			if azimuthAngleDeg >= 360 then
-				azimuthAngleDeg = 0
+				azimuthAngleDeg = 0;
 			end
 
 			local nextCamLocation = polar3DToWorld3D(coords, radius, polarAngleDeg, azimuthAngleDeg)
@@ -195,6 +204,40 @@ Citizen.CreateThread(function()
 			PointCamAtEntity(cam,  targetPed)
 			SetEntityCoords(playerPed,  coords.x, coords.y, coords.z + 10)
 
+			if IsControlPressed(2, 47) then
+				OpenAdminActionMenu(targetPlayerId)
+			end
+			
+-- taken from Easy Admin (thx to Bluethefurry)  --
+			local text = {}
+			-- cheat checks
+			local targetGod = GetPlayerInvincible(targetPlayerId)
+			if targetGod then
+				table.insert(text,"Godmode: ~r~Found~w~")
+			else
+				table.insert(text,"Godmode: ~g~Not Found~w~")
+			end
+			if not CanPedRagdoll(targetPed) and not IsPedInAnyVehicle(targetPed, false) and (GetPedParachuteState(targetPed) == -1 or GetPedParachuteState(targetPed) == 0) and not IsPedInParachuteFreeFall(targetPed) then
+				table.insert(text,"~r~Anti-Ragdoll~w~")
+			end
+			-- health info
+			table.insert(text,"Health"..": "..GetEntityHealth(targetPed).."/"..GetEntityMaxHealth(targetPed))
+			table.insert(text,"Armor"..": "..GetPedArmour(targetPed))
+
+			for i,theText in pairs(text) do
+				SetTextFont(0)
+				SetTextProportional(1)
+				SetTextScale(0.0, 0.30)
+				SetTextDropshadow(0, 0, 0, 0, 255)
+				SetTextEdge(1, 0, 0, 0, 255)
+				SetTextDropShadow()
+				SetTextOutline()
+				SetTextEntry("STRING")
+				AddTextComponentString(theText)
+				EndTextCommandDisplayText(0.3, 0.7+(i/30))
+			end
+-- end of taken from easyadmin -- 
 		end
-	end
+
+  	end
 end)
