@@ -45,6 +45,7 @@ function spectate(target)
 		SetEntityVisible(playerPed, false)
 		
 		SetEntityCoords(playerPed, player.position, 0.0, 0.0, 0.0, false)
+		Citizen.Wait(200)
 
 		PlayerData = player
 		if ShowInfos then
@@ -79,7 +80,10 @@ function resetNormalCamera()
 
 	SetEntityCollision(playerPed, true, true)
 	SetEntityVisible(playerPed, true)
-	SetEntityCoords(playerPed, LastPosition.x, LastPosition.y, LastPosition.z)
+
+	if LastPosition ~= nil then
+		SetEntityCoords(playerPed, LastPosition.x, LastPosition.y, LastPosition.z)
+	end
 end
 
 function getPlayersList(callback)
@@ -94,20 +98,6 @@ function OpenAdminActionMenu(player)
 	TriggerEvent("esx_inventoryhud:openPlayerInventory", GetPlayerServerId(player), GetPlayerName(player))
 end
 
-Citizen.CreateThread(function()
-	while true do
-		Wait(0)
-		
-		if IsControlJustReleased(1, 56) then
-			if group == "mod" or group == "admin" or group == "superadmin" then
-				TriggerEvent('esx_spectate:spectate')
-			else
-				ESX.ShowNotification("Permissões Insuficientes")
-			end
-		end
-	end
-end)
-
 RegisterCommand("spectate", function()
 	if group == "mod" or group == "admin" or group == "superadmin" then
 		TriggerEvent('esx_spectate:spectate')
@@ -115,6 +105,8 @@ RegisterCommand("spectate", function()
 		ESX.ShowNotification("Permissões Insuficientes")
 	end
 end)
+
+RegisterKeyMapping('spectate', 'Open Spectate Menu', 'keyboard', 'F9')
 
 RegisterNetEvent('esx_spectate:spectate')
 AddEventHandler('esx_spectate:spectate', function()
@@ -149,15 +141,12 @@ RegisterNUICallback('kick', function(data, cb)
 	TriggerEvent('esx_spectate:spectate')
 end)
 
-
-
 Citizen.CreateThread(function()
-  	while true do
-
-		Wait(0)
+	while true do
+		local sleep = 1500
 
 		if InSpectatorMode then
-
+			sleep = 1
 			local targetPlayerId = GetPlayerFromServerId(TargetSpectate)
 			local playerPed	  = GetPlayerPed(-1)
 			local targetPed	  = GetPlayerPed(targetPlayerId)
@@ -208,17 +197,17 @@ Citizen.CreateThread(function()
 				OpenAdminActionMenu(targetPlayerId)
 			end
 			
--- taken from Easy Admin (thx to Bluethefurry)  --
+			-- taken from Easy Admin (thx to Bluethefurry)  --
 			local text = {}
 			-- cheat checks
 			local targetGod = GetPlayerInvincible(targetPlayerId)
 			if targetGod then
-				table.insert(text,"Godmode: ~r~Found~w~")
+				table.insert(text,"Godmode: Found")
 			else
-				table.insert(text,"Godmode: ~g~Not Found~w~")
+				table.insert(text,"Godmode: Not Found")
 			end
 			if not CanPedRagdoll(targetPed) and not IsPedInAnyVehicle(targetPed, false) and (GetPedParachuteState(targetPed) == -1 or GetPedParachuteState(targetPed) == 0) and not IsPedInParachuteFreeFall(targetPed) then
-				table.insert(text,"~r~Anti-Ragdoll~w~")
+				table.insert(text,"Anti-Ragdoll")
 			end
 			-- health info
 			table.insert(text,"Health"..": "..GetEntityHealth(targetPed).."/"..GetEntityMaxHealth(targetPed))
@@ -236,8 +225,8 @@ Citizen.CreateThread(function()
 				AddTextComponentString(theText)
 				EndTextCommandDisplayText(0.3, 0.7+(i/30))
 			end
--- end of taken from easyadmin -- 
 		end
 
-  	end
+		Wait(sleep)
+	end
 end)

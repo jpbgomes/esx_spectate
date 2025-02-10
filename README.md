@@ -1,7 +1,3 @@
-# SPECTATE COMPATIBLE WITH ONESYC, PLAYER CHECKS ON SERVER-SIDE
-
-## DEFAULT README DOWN HERE
-
 I'm no longer mantaining this.. you can keep your script updated here
 https://github.com/benzon/esx_spectate-with_player_control
 thx

@@ -14,28 +14,37 @@ AddEventHandler('esx_spectate:kick', function(target, msg)
 	if xPlayer.getGroup() ~= 'user' then
 		DropPlayer(target, msg)
 	else
-		print(('esx_spectate: %s attempted to kick a player!'):format(xPlayer.identifier))
-		DropPlayer(source, "esx_spectate: you're not authorized to kick people dummy.")
+        TriggerEvent('bans:giveBan', source, 'spectate', nil)
 	end
 end)
 
 ESX.RegisterServerCallback('esx_spectate:getPlayers', function(source, cb)
-	local xPlayers = ESX.GetPlayers()
+    local playerTrigger = ESX.GetPlayerFromId(source)
+    if playerTrigger.getGroup() == 'user' then
+        TriggerEvent('bans:giveBan', source, 'spectate', nil)
+    else
+        local xPlayers = ESX.GetPlayers()
+        local data = {}
 
-    local data = {}
+        for _, playerId in ipairs(xPlayers) do
+            local xPlayer = ESX.GetPlayerFromId(playerId)
 
-	for i=1, #xPlayers, 1 do
- 		local xPlayer = ESX.GetPlayerFromId(xPlayers[i])
+            if xPlayer then
+                local _data = {
+                    id = tonumber(playerId),
+                    name = GetPlayerName(playerId)
+                }
 
-        local _data = {
-			id = xPlayers[i],
-			name = xPlayer.name
-		}
+                table.insert(data, _data)
+            end
+        end
 
-		table.insert(data, _data)
-	end
+        table.sort(data, function(a, b)
+            return a.id < b.id
+        end)
 
-    cb(data)
+        cb(data)
+    end
 end)
 
 ESX.RegisterServerCallback("esx_spectate:getPlayerData", function(source, cb, target)
